@@ -23,8 +23,16 @@
         "backgroundColor": "#ffffff"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "extra": {
+      "eas": {
+        "projectId": "3c850b84-fb2a-4396-a9b6-864bc2306bfa"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3c850b84-fb2a-4396-a9b6-864bc2306bfa"
     }
   }
 }
