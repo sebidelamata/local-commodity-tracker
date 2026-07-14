@@ -46,10 +46,6 @@ export default function VaultScreen({ navigation }) {
       const data = await commoditiesRes.json();
       const prices = await pricesRes.json();
 
-      setSpotPrices(prices.data || {});
-
-      const data = await res.json();
-
       if (!res.ok) {
 
         if (res.status === 401) {
@@ -71,6 +67,8 @@ export default function VaultScreen({ navigation }) {
           ? data
           : []
       );
+
+      setSpotPrices(prices.data || {});
 
 
     } catch (err) {
