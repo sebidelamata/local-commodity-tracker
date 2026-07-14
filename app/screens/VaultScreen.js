@@ -46,9 +46,9 @@ export default function VaultScreen({ navigation }) {
       const data = await commoditiesRes.json();
       const prices = await pricesRes.json();
 
-      if (!res.ok) {
+      if (!commoditiesRes.ok) {
 
-        if (res.status === 401) {
+        if (commoditiesRes.status === 401) {
           Alert.alert(
             "Session expired",
             "Please login again."
@@ -77,6 +77,7 @@ export default function VaultScreen({ navigation }) {
         "Vault fetch failed:",
         err
       );
+      console.error(err.stack);
 
       setCommodities([]);
 
