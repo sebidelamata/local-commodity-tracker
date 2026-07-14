@@ -18,6 +18,7 @@ export default function VaultScreen({ navigation }) {
   const { token, logout } = useAuth();
 
   const [commodities, setCommodities] = useState([]);
+  const [spotPrices, setSpotPrices] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -25,13 +26,21 @@ export default function VaultScreen({ navigation }) {
   const fetchCommodities = async () => {
     try {
 
-      const res = await fetch(API + '/commodities', {
-        headers: {
-          Authorization: 'Bearer ' + token
-        }
-      });
+      const [commoditiesRes, pricesRes] = await Promise.all([
+        fetch(API + "/commodities", {
+          headers: {
+            Authorization: "Bearer " + token
+          }
+        }),
+        fetch(API + "/prices/spot", {
+          headers: {
+            Authorization: "Bearer " + token
+          }
+        })
+      ]);
 
-      const data = await res.json();
+      const data = await commoditiesRes.json();
+      const prices = await pricesRes.json();
 
       if (!res.ok) {
 
@@ -53,6 +62,9 @@ export default function VaultScreen({ navigation }) {
         Array.isArray(data)
           ? data
           : []
+      );
+      setSpotPrices(
+        prices.data || {}
       );
 
 
@@ -203,7 +215,26 @@ export default function VaultScreen({ navigation }) {
         renderItem={({item}) => {
 
           const totalWeight =
-  (item.quantity * item.weight_oz).toFixed(4);
+            (item.quantity * item.weight_oz).toFixed(4);
+
+          const spot =
+            Number(
+              spotPrices?.[item.metal]?.oz || 0
+            );
+
+        const currentValue =
+          Number(item.quantity) *
+          Number(item.weight_oz) *
+          spot;
+
+        const gain =
+          currentValue -
+          Number(item.total_cost);
+
+        const returnPct =
+          item.total_cost > 0
+            ? (gain / item.total_cost) * 100
+            : 0;
 
 
           return (
@@ -219,7 +250,7 @@ export default function VaultScreen({ navigation }) {
 
 
               <Text style={styles.cardCost}>
-                ${item.total_cost}
+                Cost: ${Number(item.total_cost).toFixed(2)}
               </Text>
 
             </View>
@@ -282,6 +313,71 @@ export default function VaultScreen({ navigation }) {
               <Text style={styles.cardValue}>
                 {totalWeight || "?"} oz
               </Text>
+            </View>
+
+            <View style={styles.cardRow}>
+
+              <Text style={styles.cardLabel}>
+                Current Value
+              </Text>
+
+              <Text
+                style={[
+                  styles.cardValue,
+                  { color: "#4ecca3" }
+                ]}
+              >
+                ${currentValue.toFixed(2)}
+              </Text>
+
+            </View>
+
+            <View style={styles.cardRow}>
+
+              <Text style={styles.cardLabel}>
+                Gain / Loss
+              </Text>
+
+              <Text
+                style={[
+                  styles.cardValue,
+                  {
+                    color:
+                      gain >= 0
+                        ? "#4ecca3"
+                        : "#e94560",
+                    fontWeight: "bold"
+                  }
+                ]}
+              >
+                {gain >= 0 ? "+" : ""}
+                ${gain.toFixed(2)}
+              </Text>
+
+            </View>
+
+            <View style={styles.cardRow}>
+
+              <Text style={styles.cardLabel}>
+                Return
+              </Text>
+
+              <Text
+                style={[
+                  styles.cardValue,
+                  {
+                    color:
+                      returnPct >= 0
+                        ? "#4ecca3"
+                        : "#e94560",
+                    fontWeight: "bold"
+                  }
+                ]}
+              >
+                {returnPct >= 0 ? "+" : ""}
+                {returnPct.toFixed(2)}%
+              </Text>
+
             </View>
 
 
