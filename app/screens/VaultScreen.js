@@ -18,6 +18,7 @@ export default function VaultScreen({ navigation }) {
   const { token, logout } = useAuth();
 
   const [commodities, setCommodities] = useState([]);
+  const [spotPrices, setSpotPrices] = useState({});
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -26,11 +27,26 @@ export default function VaultScreen({ navigation }) {
   const fetchCommodities = async () => {
     try {
 
-      const res = await fetch(API + '/commodities', {
-        headers: {
-          Authorization: 'Bearer ' + token
-        }
-      });
+      const [commoditiesRes, pricesRes] = await Promise.all([
+
+        fetch(API + '/commodities', {
+          headers: {
+            Authorization: 'Bearer ' + token
+          }
+        }),
+
+        fetch(API + '/prices/spot', {
+          headers: {
+            Authorization: 'Bearer ' + token
+          }
+        })
+
+      ]);
+
+      const data = await commoditiesRes.json();
+      const prices = await pricesRes.json();
+
+      setSpotPrices(prices.data || {});
 
       const data = await res.json();
 
@@ -203,8 +219,28 @@ export default function VaultScreen({ navigation }) {
 
         renderItem={({item}) => {
 
-          const totalWeight =
-  (item.quantity * item.weight_oz).toFixed(4);
+          const totalWeight = (item.quantity * item.weight_oz).toFixed(4);
+          const spotPrice =
+            item.metal?.toLowerCase() === "gold"
+              ? spotPrices.gold?.price
+              : item.metal?.toLowerCase() === "silver"
+                ? spotPrices.silver?.price
+                : null;
+
+          const currentValue =
+            spotPrice
+              ? spotPrice * item.weight_oz * item.quantity
+              : null;
+
+          const gainLoss =
+            currentValue != null
+              ? currentValue - Number(item.total_cost)
+              : null;
+
+          const returnPct =
+            gainLoss != null
+              ? (gainLoss / Number(item.total_cost)) * 100
+              : null;
 
 
           return (
@@ -284,6 +320,32 @@ export default function VaultScreen({ navigation }) {
                 {totalWeight || "?"} oz
               </Text>
             </View>
+
+            {gainLoss !== null && (
+
+              <View style={styles.cardRow}>
+
+                <Text style={styles.cardLabel}>
+                  Return
+                </Text>
+
+                <Text
+                  style={{
+                    color: gainLoss >= 0 ? "#4ecca3" : "#e94560",
+                    fontWeight: "bold"
+                  }}
+                >
+                  {gainLoss >= 0 ? "+" : ""}
+                  ${gainLoss.toFixed(2)}
+                  {"  ("}
+                  {returnPct >= 0 ? "+" : ""}
+                  {returnPct.toFixed(2)}%
+                  {")"}
+                </Text>
+
+              </View>
+
+              )}
 
 
 
