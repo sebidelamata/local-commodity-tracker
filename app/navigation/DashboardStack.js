@@ -29,6 +29,9 @@ export default function DashboardScreen() {
 
   const [spotPrices, setSpotPrices] = useState({});
 
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
   const fetchCommodities = async () => {
     try {
       const res = await fetch(API + '/commodities', {
@@ -56,7 +59,6 @@ export default function DashboardScreen() {
       let json;
       try {
         json = JSON.parse(text);
-        console.log("RAW PRICE RESPONSE:", json);
       } catch (e) {
         console.log("RAW PRICE RESPONSE:", text);
         return;
@@ -68,12 +70,41 @@ export default function DashboardScreen() {
     }
   };
 
+  const fetchPortfolioHistory = async () => {
+    setHistoryLoading(true);
+
+    try {
+      const res = await fetch(
+        `${API}/portfolio/history?metric=${metric}&groupBy=${groupBy}`,
+        { headers: { Authorization: 'Bearer ' + token } }
+      );
+
+      const json = await res.json();
+
+      if (json.success) {
+        setHistory(json.data);
+      } else {
+        console.error('Portfolio history error:', json.error);
+        setHistory(null);
+      }
+    } catch (e) {
+      console.error(e);
+      setHistory(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchCommodities();
       fetchPrices();
     }, [])
   );
+
+  useEffect(() => {
+    fetchPortfolioHistory();
+  }, [metric, groupBy]);
 
   if (loading) {
     return (
@@ -86,24 +117,23 @@ export default function DashboardScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       <View style={styles.header}>
-      
+
         <Text style={styles.title}>
           My Dashboard
         </Text>
 
-
         <TouchableOpacity onPress={logout}>
-
           <Text style={styles.logout}>
             Logout
           </Text>
-
         </TouchableOpacity>
 
       </View>
+
       <PriceTickerBanner
         spotPrices={spotPrices}
       />
+
       <PortfolioReturnCard
         commodities={commodities}
         spotPrices={spotPrices}
@@ -151,10 +181,8 @@ export default function DashboardScreen() {
 
       {/* LINE CHART */}
       <PortfolioLineChart
-        data={commodities}
-        groupBy={groupBy}
-        metric={metric}
-        spotPrices={spotPrices}
+        history={history}
+        loading={historyLoading}
       />
     </ScrollView>
   );
@@ -188,15 +216,15 @@ const styles = StyleSheet.create({
     borderColor: '#4ecca3',
   },
 
-  logout:{
-    color:'#e94560',
-    borderWidth:1,
-    borderColor:'#e94560',
-    padding:6,
-    borderRadius:6
+  logout: {
+    color: '#e94560',
+    borderWidth: 1,
+    borderColor: '#e94560',
+    padding: 6,
+    borderRadius: 6
   },
 
-  header:{
+  header: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
