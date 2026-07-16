@@ -26,6 +26,7 @@ export default function PortfolioLineChart({ history, loading }) {
 
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [hidden, setHidden] = useState({});
+  console.log('PortfolioLineChart history:', history);
 
   const chartData = useMemo(() => {
     if (!history || !history.dates || !history.dates.length) {
