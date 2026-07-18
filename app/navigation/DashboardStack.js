@@ -25,12 +25,14 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
 
   const [groupBy, setGroupBy] = useState('name');
-  const [metric, setMetric] = useState(METRICS.COST);
+  const [metric, setMetric] = useState(METRICS.VALUE);
 
   const [spotPrices, setSpotPrices] = useState({});
 
   const [history, setHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(true);
+
+  const [previousPrices, setPreviousPrices] = useState({});
 
   const fetchCommodities = async () => {
     try {
@@ -83,6 +85,7 @@ export default function DashboardScreen() {
 
       if (json.success) {
         setHistory(json.data);
+        console.log('Portfolio history fetched:', json.data.series);
       } else {
         console.error('Portfolio history error:', json.error);
         setHistory(null);
@@ -95,10 +98,27 @@ export default function DashboardScreen() {
     }
   };
 
+  const fetchPreviousPrices = async () => {
+    try {
+      const res = await fetch(API + '/prices/previous', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+
+      const json = await res.json();
+
+      if (json.success) {
+        setPreviousPrices(json.data || {});
+      }
+    } catch (e) {
+      console.error(e);
+    }
+};
+
   useFocusEffect(
     useCallback(() => {
       fetchCommodities();
       fetchPrices();
+      fetchPreviousPrices();
     }, [])
   );
 
@@ -132,6 +152,10 @@ export default function DashboardScreen() {
 
       <PriceTickerBanner
         spotPrices={spotPrices}
+        history={{
+          gold: { previous: { price: previousPrices.gold?.price } },
+          silver: { previous: { price: previousPrices.silver?.price } },
+        }}
       />
 
       <PortfolioReturnCard
