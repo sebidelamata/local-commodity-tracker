@@ -15,6 +15,13 @@ import PortfolioPieChart from '../components/charts/PortfolioPieChart';
 import PortfolioLineChart from '../components/charts/PortfolioLineChart';
 import PriceTickerBanner from "../components/charts/PriceTickerBanner";
 import PortfolioReturnCard from "../components/charts/PortfolioReturnCard";
+import GoldSilverRatioCard from "../components/charts/GoldSilverRatioCard";
+import AvgCostPerOzCard from "../components/charts/AvgCostPerOzCard";
+import PurchaseHabitsCard from "../components/charts/PurchaseHabitsCard";
+import BestWorstHoldingCard from "../components/charts/BestWorstHoldingCard";
+import TimeWeightedReturnCard from "../components/charts/TimeWeightedReturnCard";
+import DrawdownClimbCard from "../components/charts/DrawdownClimbCard";
+import PurchasePercentileCard from "../components/charts/PurchasePercentileCard";
 
 import { METRICS } from '../lib/portfolioMetrics';
 
@@ -33,6 +40,9 @@ export default function DashboardScreen() {
   const [historyLoading, setHistoryLoading] = useState(true);
 
   const [previousPrices, setPreviousPrices] = useState({});
+
+  const [valueHistory, setValueHistory] = useState(null);
+  const [valueHistoryLoading, setValueHistoryLoading] = useState(true);
 
   const fetchCommodities = async () => {
     try {
@@ -114,11 +124,36 @@ export default function DashboardScreen() {
     }
 };
 
+const fetchValueHistory = async () => {
+  setValueHistoryLoading(true);
+
+  try {
+    const res = await fetch(
+      `${API}/portfolio/history?metric=value&groupBy=portfolio`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+
+    const json = await res.json();
+
+    if (json.success) {
+      setValueHistory(json.data);
+    } else {
+      setValueHistory(null);
+    }
+  } catch (e) {
+    console.error(e);
+    setValueHistory(null);
+  } finally {
+    setValueHistoryLoading(false);
+  }
+};
+
   useFocusEffect(
     useCallback(() => {
       fetchCommodities();
       fetchPrices();
       fetchPreviousPrices();
+      fetchValueHistory();
     }, [])
   );
 
@@ -158,7 +193,17 @@ export default function DashboardScreen() {
         }}
       />
 
+      <GoldSilverRatioCard
+        spotPrices={spotPrices}
+        previousPrices={previousPrices}
+      />
+
       <PortfolioReturnCard
+        commodities={commodities}
+        spotPrices={spotPrices}
+      />
+
+      <AvgCostPerOzCard
         commodities={commodities}
         spotPrices={spotPrices}
       />
@@ -208,6 +253,33 @@ export default function DashboardScreen() {
         history={history}
         loading={historyLoading}
       />
+
+      <BestWorstHoldingCard
+        commodities={commodities}
+        spotPrices={spotPrices}
+        groupBy={groupBy}
+      />
+
+      <TimeWeightedReturnCard
+        history={valueHistory}
+        loading={valueHistoryLoading}
+        commodities={commodities}
+      />
+
+      <DrawdownClimbCard
+        history={valueHistory}
+        loading={valueHistoryLoading}
+        commodities={commodities}
+      />
+
+      <PurchaseHabitsCard
+        commodities={commodities}
+      />
+
+      <PurchasePercentileCard
+        commodities={commodities}
+      />
+      
     </ScrollView>
   );
 }
