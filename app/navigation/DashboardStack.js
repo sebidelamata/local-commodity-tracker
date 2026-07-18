@@ -22,6 +22,7 @@ import BestWorstHoldingCard from "../components/charts/BestWorstHoldingCard";
 import TimeWeightedReturnCard from "../components/charts/TimeWeightedReturnCard";
 import DrawdownClimbCard from "../components/charts/DrawdownClimbCard";
 import PurchasePercentileCard from "../components/charts/PurchasePercentileCard";
+import BiggestMoveCard from "../components/charts/BiggestMoveCard";
 
 import { METRICS } from '../lib/portfolioMetrics';
 
@@ -261,6 +262,12 @@ const fetchValueHistory = async () => {
       />
 
       <TimeWeightedReturnCard
+        history={valueHistory}
+        loading={valueHistoryLoading}
+        commodities={commodities}
+      />
+
+      <BiggestMoveCard
         history={valueHistory}
         loading={valueHistoryLoading}
         commodities={commodities}
