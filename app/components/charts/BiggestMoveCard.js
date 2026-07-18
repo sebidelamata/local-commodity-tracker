@@ -76,7 +76,8 @@ export default function BiggestMoveCard({
 
     const dollarChange = prefix[n - 1] - prefix[ytdAnchorIdx];
     const startValue = values[ytdAnchorIdx];
-    const pctChange = startValue > 0 ? (dollarChange / startValue) * 100 : 0;
+    const MIN_BASE = 50;
+    const pctChange = startValue >= MIN_BASE ? (dollarChange / startValue) * 100 : null;
 
     return { dollarChange, pctChange, fromDate: dates[ytdAnchorIdx], toDate: lastDate };
 
@@ -206,14 +207,27 @@ function YtdStatLine({ stat }) {
   const isPositive = stat.dollarChange >= 0;
   const color = isPositive ? "#4ecca3" : "#e94560";
 
+  const pctText =
+    stat.pctChange === null
+      ? ""
+      : ` (${stat.pctChange > 0 ? "+" : ""}${stat.pctChange.toFixed(2)}%)`;
+
   return (
-    <Text style={styles.ytdLine}>
-      YTD cumulative move:{" "}
-      <Text style={{ color, fontWeight: "bold" }}>
-        {isPositive ? "+" : "-"}${Math.abs(stat.dollarChange).toFixed(2)}
-        {" "}({isPositive ? "+" : ""}{stat.pctChange.toFixed(2)}%)
+    <View style={styles.ytdBlock}>
+
+      <Text style={styles.ytdLine}>
+        YTD cumulative move:{" "}
+        <Text style={{ color, fontWeight: "bold" }}>
+          {isPositive ? "+" : "-"}${Math.abs(stat.dollarChange).toFixed(2)}
+          {pctText}
+        </Text>
       </Text>
-    </Text>
+
+      <Text style={styles.ytdDateRange}>
+        {formatShortDate(stat.fromDate)} → {formatShortDate(stat.toDate)}
+      </Text>
+
+    </View>
   );
 }
 
@@ -327,6 +341,16 @@ const styles = StyleSheet.create({
     color: "#888",
     fontSize: 12,
     marginBottom: 12,
+  },
+
+  ytdBlock: {
+    marginBottom: 12,
+  },
+
+  ytdDateRange: {
+    color: "#555",
+    fontSize: 10,
+    marginTop: 2,
   },
 
   headerRow: {

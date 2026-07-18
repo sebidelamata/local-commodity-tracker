@@ -2,80 +2,123 @@ import React, { useMemo } from "react";
 
 import { View, Text, StyleSheet } from "react-native";
 
-const RECENT_COUNT = 5;
+const RECENT_VISITS = 5;
 
 export default function PurchasePercentileCard({ commodities = [] }) {
 
-  const ranked = useMemo(() => {
+  const recentVisits = useMemo(() => {
 
-    const withMetal = commodities.filter(c => c.metal && c.date);
+    const withData = commodities.filter(c => c.metal && c.date && c.name);
 
-    if (!withMetal.length) return null;
-
-    // ------------------------------------
-    // Price per oz for each purchase line
-    // ------------------------------------
-
-    const enriched = withMetal
-      .map(c => {
-
-        const qty = Number(c.quantity) || 0;
-        const oz = Number(c.weight_oz) || 0;
-        const cost = Number(c.total_cost) || 0;
-
-        const totalOz = qty * oz;
-        const pricePerOz = totalOz > 0 ? cost / totalOz : null;
-
-        return { ...c, pricePerOz };
-      })
-      .filter(c => c.pricePerOz !== null);
+    if (!withData.length) return null;
 
     // ------------------------------------
-    // Rank within each metal, cheapest first
+    // Group into visit -> metal -> name.
+    // Ranking happens at the metal level
+    // within a visit (the "buy"); names
+    // underneath are just a breakdown.
+    // ------------------------------------
+
+    const visitMap = {};
+
+    for (const c of withData) {
+
+      const qty = Number(c.quantity) || 0;
+      const oz = Number(c.weight_oz) || 0;
+      const cost = Number(c.total_cost) || 0;
+
+      if (!visitMap[c.date]) {
+        visitMap[c.date] = { date: c.date, totalCost: 0, metals: {} };
+      }
+
+      const visit = visitMap[c.date];
+      visit.totalCost += cost;
+
+      if (!visit.metals[c.metal]) {
+        visit.metals[c.metal] = {
+          metal: c.metal,
+          totalCost: 0,
+          totalOz: 0,
+          names: {},
+        };
+      }
+
+      const metalGroup = visit.metals[c.metal];
+      metalGroup.totalCost += cost;
+      metalGroup.totalOz += qty * oz;
+
+      if (!metalGroup.names[c.name]) {
+        metalGroup.names[c.name] = { name: c.name, totalCost: 0, totalOz: 0 };
+      }
+
+      metalGroup.names[c.name].totalCost += cost;
+      metalGroup.names[c.name].totalOz += qty * oz;
+    }
+
+    const visits = Object.values(visitMap).map(v => ({
+      date: v.date,
+      totalCost: v.totalCost,
+      metals: Object.values(v.metals)
+        .filter(m => m.totalOz > 0)
+        .map(m => ({
+          metal: m.metal,
+          totalCost: m.totalCost,
+          totalOz: m.totalOz,
+          pricePerOz: m.totalCost / m.totalOz,
+          names: Object.values(m.names)
+            .filter(n => n.totalOz > 0)
+            .map(n => ({
+              ...n,
+              pricePerOz: n.totalCost / n.totalOz,
+            })),
+        })),
+    }));
+
+    // ------------------------------------
+    // Rank each visit's metal-aggregate
+    // against every other visit's buy of
+    // that same metal, across all history
     // ------------------------------------
 
     const byMetal = {};
 
-    for (const c of enriched) {
-      if (!byMetal[c.metal]) byMetal[c.metal] = [];
-      byMetal[c.metal].push(c);
+    for (const visit of visits) {
+      for (const metalGroup of visit.metals) {
+        if (!byMetal[metalGroup.metal]) byMetal[metalGroup.metal] = [];
+        byMetal[metalGroup.metal].push(metalGroup);
+      }
     }
 
     for (const metal of Object.keys(byMetal)) {
       byMetal[metal].sort((a, b) => a.pricePerOz - b.pricePerOz);
-    }
 
-    const rankMap = new Map();
-
-    for (const metal of Object.keys(byMetal)) {
-      byMetal[metal].forEach((item, idx) => {
-        rankMap.set(item, { rank: idx + 1, total: byMetal[metal].length });
+      byMetal[metal].forEach((group, idx) => {
+        group.rank = idx + 1;
+        group.total = byMetal[metal].length;
       });
     }
 
     // ------------------------------------
-    // Show most recent purchases, each
-    // annotated with its rank
+    // Return most recent visits
     // ------------------------------------
 
-    return [...enriched]
+    return visits
       .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, RECENT_COUNT)
-      .map(item => ({ ...item, ...rankMap.get(item) }));
+      .slice(0, RECENT_VISITS);
 
   }, [commodities]);
 
-  if (!ranked || !ranked.length) return null;
+  if (!recentVisits || !recentVisits.length) return null;
 
   return (
     <View style={styles.card}>
 
       <Text style={styles.title}>RECENT BUYS RANKED</Text>
 
-      {ranked.map((item, idx) => (
-        <PurchaseRow
-          key={`${item.id ?? idx}-${item.date}`}
-          item={item}
+      {recentVisits.map((visit, idx) => (
+        <VisitBlock
+          key={visit.date}
+          visit={visit}
           isFirst={idx === 0}
         />
       ))}
@@ -84,9 +127,29 @@ export default function PurchasePercentileCard({ commodities = [] }) {
   );
 }
 
-function PurchaseRow({ item, isFirst }) {
+function VisitBlock({ visit, isFirst }) {
 
-  const { rank, total, pricePerOz, metal, name, date } = item;
+  return (
+    <View style={[styles.visitBlock, !isFirst && styles.visitBorder]}>
+
+      <View style={styles.visitHeader}>
+        <Text style={styles.visitDate}>{formatDate(visit.date)}</Text>
+        <Text style={styles.visitTotal}>
+          ${visit.totalCost.toFixed(2)} total
+        </Text>
+      </View>
+
+      {visit.metals.map(metalGroup => (
+        <MetalGroupBlock key={metalGroup.metal} group={metalGroup} />
+      ))}
+
+    </View>
+  );
+}
+
+function MetalGroupBlock({ group }) {
+
+  const { metal, rank, total, pricePerOz, totalCost, names } = group;
 
   const isTopHalf = rank <= Math.ceil(total / 2);
 
@@ -99,21 +162,34 @@ function PurchaseRow({ item, isFirst }) {
       : `${ordinal(rank)} cheapest ${metal} buy of ${total}`;
 
   return (
-    <View style={[styles.row, !isFirst && styles.rowBorder]}>
+    <View style={styles.metalBlock}>
 
-      <View style={styles.rowLeft}>
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.date}>{formatDate(date)}</Text>
+      <View style={styles.metalHeader}>
+        <Text style={styles.metalLabel}>{metal}</Text>
+
+        <View style={styles.metalHeaderRight}>
+          <Text style={styles.metalPrice}>
+            ${pricePerOz.toFixed(2)}/oz avg
+          </Text>
+          <Text style={[styles.metalRank, { color }]}>
+            {rankText}
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.rowRight}>
-        <Text style={styles.price}>
-          ${pricePerOz.toFixed(2)}/oz
-        </Text>
-        <Text style={[styles.rank, { color }]}>
-          {rankText}
-        </Text>
-      </View>
+      {names.map(n => (
+        <View key={n.name} style={styles.nameRow}>
+          <Text style={styles.nameLabel}>{n.name}</Text>
+          <View style={styles.nameRight}>
+            <Text style={styles.namePrice}>
+              ${n.pricePerOz.toFixed(2)}/oz
+            </Text>
+            <Text style={styles.nameCost}>
+              ${n.totalCost.toFixed(2)}
+            </Text>
+          </View>
+        </View>
+      ))}
 
     </View>
   );
@@ -152,47 +228,93 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
+  visitBlock: {
+    paddingVertical: 10,
   },
 
-  rowBorder: {
+  visitBorder: {
     borderTopWidth: 1,
     borderTopColor: "#1f2a44",
   },
 
-  rowLeft: {
-    flexShrink: 1,
+  visitHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
 
-  name: {
-    color: "#fff",
-    fontSize: 14,
+  visitDate: {
+    color: "#aaa",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+
+  visitTotal: {
+    color: "#888",
+    fontSize: 12,
     fontWeight: "600",
   },
 
-  date: {
-    color: "#555",
-    fontSize: 11,
-    marginTop: 2,
+  metalBlock: {
+    marginBottom: 8,
+    paddingLeft: 8,
   },
 
-  rowRight: {
+  metalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  metalLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  metalHeaderRight: {
     alignItems: "flex-end",
   },
 
-  price: {
+  metalPrice: {
     color: "#ccc",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
   },
 
-  rank: {
+  metalRank: {
     fontSize: 11,
     marginTop: 2,
     fontWeight: "600",
+  },
+
+  nameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 3,
+    paddingLeft: 10,
+  },
+
+  nameLabel: {
+    color: "#999",
+    fontSize: 12,
+  },
+
+  nameRight: {
+    flexDirection: "row",
+  },
+
+  namePrice: {
+    color: "#777",
+    fontSize: 11,
+    marginRight: 10,
+  },
+
+  nameCost: {
+    color: "#666",
+    fontSize: 11,
   },
 });
